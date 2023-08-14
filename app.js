@@ -1,6 +1,5 @@
 const mysql = require("mysql")
 const express = require("express");
-const { createBrotliCompress } = require("zlib");
 const app = express()
 const port = 3000;
 
@@ -25,7 +24,7 @@ db.connect((err) => {
     });
 });
 
-app.put("/data", (req, res) => {
+app.put("/data", (req, res, next) => {
     const temperature = req.query.temperature;
     const humidity = req.query.humidity;
     const room = req.query.room;
@@ -37,7 +36,7 @@ app.put("/data", (req, res) => {
         if (err) {
             res.statusCode = 400
             res.send("Data insertion failed");
-            throw err;
+            next(err);
         }
 
         console.log("Data insertion complete");
@@ -47,7 +46,7 @@ app.put("/data", (req, res) => {
 
 })
 
-app.get("/data", (req, res) => {
+app.get("/data", (req, res, next) => {
     const roomId = req.query.roomId;
     res.setHeader("Content-Type", "application/json");
 
@@ -55,21 +54,34 @@ app.get("/data", (req, res) => {
         if (err) {
             res.statusCode = 400;
             res.setHeader("Content-Type", "text/html");
-            res.send("Data insertion failed");
-            throw err;
+            res.send("Room data table GET request failed");
+            next(err);
         }
 
         const room_data_table_json = JSON.stringify(result);
-        console.log("Room data table sent --> " + room_data_table_json);
+        console.log("Room data table GET request successful --> " + room_data_table_json);
         res.statusCode = 200;
         res.send(room_data_table_json);
     });
 })
 
-app.get("/data/room", (req, res) => {
+app.get("/data/room", (req, res, next) => {
     const roomId = req.query.roomId;
-    
-    
+    res.setHeader("Content-Type", "application/json");
+
+    const room_data = db.query("SELECT * FROM data_table WHERE (room=" + roomId + " AND time=(SELECT MAX(time) FROM data_table))", (err, result) => {
+        if (err) {
+            res.statusCode = 400;
+            res.setHeader("Content-Type", "text/html");
+            res.send("Latest data table GET request failed");
+            next(err);
+        }
+
+        const room_data_table_json = JSON.stringify(result);
+        console.log("Latest room data GET request successful --> " + room_data_table_json);
+        res.statusCode = 200;
+        res.send(room_data_table_json);
+    });
 });
 
 app.listen(port, () => {
